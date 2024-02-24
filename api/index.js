@@ -5,6 +5,9 @@ const jwt = require("jsonwebtoken");
 const { default: mongoose } = require("mongoose");
 const User = require("./models/User");
 const CookieParser = require("cookie-parser");
+const download = require("image-downloader");
+const multer = require("multer");
+const fs = require("fs");
 
 require("dotenv").config();
 
@@ -12,6 +15,7 @@ const app = express();
 
 app.use(express.json());
 app.use(CookieParser());
+app.use("/uploads", express.static(__dirname + "/uploads"));
 
 const corsOptions = {
   origin: "http://127.0.0.1:5173",
@@ -78,6 +82,27 @@ app.get("/", (req, res) => {
 
 app.post("/logout", (req, res) => {
   res.cookie("token", "").json(true);
+});
+
+app.post("/upload-by-link", async (req, res) => {
+  const { link } = req.body;
+  const newName = "photo" + Date.now() + ".jpg";
+  await download.image({ url: link, dest: __dirname + "/uploads/" + newName });
+  res.json(newName);
+});
+
+const photosMiddleware = multer({ dest: "uploads/" });
+app.post("/upload", photosMiddleware.array("photos", 100), (req, res) => {
+  const uploadedFiles = [];
+  for (let i = 0; i < req.files.length; i++) {
+    const { path, originalname } = req.files[i];
+    const parts = originalname.split(".");
+    const ext = parts[parts.length - 1];
+    const pathNew = path + "." + ext;
+    fs.renameSync(path, pathNew);
+    uploadedFiles.push(pathNew);
+  }
+  res.json(uploadedFiles);
 });
 
 app.listen(4000);
